@@ -1,0 +1,231 @@
+<!-- File: game/matching.html -->
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Ghép Từ - WordQuest</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/jpeg" href="asset/BTT.jpg">
+  <style>
+    body {
+      background: linear-gradient(to right, #2c3e50, #6a89cc);
+      font-family: 'Poppins', sans-serif;
+      padding-top: 60px;
+    }
+    .game-box {
+      background-color: #dbe7f1;
+      border-radius: 20px;
+      padding: 30px;
+      max-width: 900px;
+      margin: auto;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+      position: relative;
+    }
+    .column-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+    .word-btn {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 10px;
+      border-radius: 12px;
+      border: none;
+      background-color: #fff;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+      transition: all 0.2s;
+    }
+    .word-btn:hover {
+      background-color: #f1f3f5;
+    }
+    .word-btn.selected {
+      background-color: #d0ebff;
+    }
+    .word-btn.correct {
+      background-color: #d1e7dd !important;
+      color: #0f5132;
+    }
+    .word-btn.incorrect {
+      background-color: #f8d7da !important;
+      color: #842029;
+    }
+    .controls {
+      text-align: center;
+      margin-top: 30px;
+    }
+    .btn-secondary {
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .btn-secondary:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.15);
+    }
+    .congrats-message {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: rgba(255, 255, 255, 0.95);
+      padding: 30px 40px;
+      border-radius: 16px;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.15);
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #198754;
+      z-index: 10;
+      display: none;
+    }
+
+    @media (max-width: 768px) {
+      .row > div {
+        flex: 0 0 50%;
+        max-width: 50%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="game-box">
+      <div id="congratsBox" class="congrats-message">🎉 Chúc mừng! Bạn đã hoàn thành!</div>
+      <h3 class="text-center mb-4">🧩 Ghép Từ – Trình độ <span id="levelText">A1</span></h3>
+      <p class="text-center mb-4">Chọn từ tiếng Anh và nghĩa đúng để ghép cặp!</p>
+      <div class="row d-flex">
+        <div class="col-md-6">
+          <div class="column-title text-center">Từ tiếng Anh</div>
+          <div id="englishList"></div>
+        </div>
+        <div class="col-md-6">
+          <div class="column-title text-center">Nghĩa tiếng Việt</div>
+          <div id="vietnameseList"></div>
+        </div>
+      </div>
+      <div class="controls">
+        <button class="btn btn-secondary" onclick="loadNewSet()">🔄 Câu mới</button>
+        <a href="../choose-level.html" class="btn btn-secondary ms-2">⬅️ Quay lại</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let words = [];
+    let selectedEnglish = null;
+    let selectedVietnamese = null;
+    let totalMatched = 0;
+    let currentSet = [];
+
+    const params = new URLSearchParams(window.location.search);
+    const level = params.get("level") || "A1";
+    document.getElementById("levelText").textContent = level;
+
+    async function loadData() {
+      const res = await fetch(`../data/${level}.json`);
+      words = await res.json();
+      setTimeout(loadNewSet, 1000);
+    }
+
+    function shuffle(arr) {
+      return arr.sort(() => 0.5 - Math.random());
+    }
+
+    function speak(text) {
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = 'en-US';
+      utter.rate = 0.8;
+      speechSynthesis.speak(utter);
+    }
+
+    function loadNewSet() {
+      const englishBox = document.getElementById("englishList");
+      const vietnameseBox = document.getElementById("vietnameseList");
+      englishBox.innerHTML = "";
+      vietnameseBox.innerHTML = "";
+      document.getElementById("congratsBox").style.display = "none";
+      selectedEnglish = null;
+      selectedVietnamese = null;
+      totalMatched = 0;
+
+      currentSet = shuffle(words).slice(0, 5);
+      const enWords = shuffle([...currentSet]);
+      const viWords = shuffle([...currentSet]);
+
+      enWords.forEach(item => {
+        const btn = document.createElement("button");
+        btn.className = "word-btn";
+        btn.innerText = item.word;
+        btn.onclick = () => selectEnglish(btn, item);
+        englishBox.appendChild(btn);
+      });
+
+      viWords.forEach(item => {
+        const btn = document.createElement("button");
+        btn.className = "word-btn";
+        btn.innerText = item.meaning;
+        btn.onclick = () => selectVietnamese(btn, item);
+        vietnameseBox.appendChild(btn);
+      });
+    }
+
+    function selectEnglish(btn, item) {
+      if (btn.classList.contains("correct")) return;
+      clearSelection("englishList");
+      btn.classList.add("selected");
+      selectedEnglish = { btn, item };
+      tryMatch();
+    }
+
+    function selectVietnamese(btn, item) {
+      if (btn.classList.contains("correct")) return;
+      clearSelection("vietnameseList");
+      btn.classList.add("selected");
+      selectedVietnamese = { btn, item };
+      tryMatch();
+    }
+
+    function clearSelection(listId) {
+      document.querySelectorAll(`#${listId} .word-btn`).forEach(b => b.classList.remove("selected"));
+    }
+
+    function tryMatch() {
+      if (selectedEnglish && selectedVietnamese) {
+        const eng = selectedEnglish.item;
+        const vie = selectedVietnamese.item;
+
+        if (eng.meaning === vie.meaning) {
+          selectedEnglish.btn.classList.add("correct");
+          selectedVietnamese.btn.classList.add("correct");
+          speak(eng.word);
+          totalMatched++;
+
+          if (totalMatched === 5) {
+            const box = document.getElementById("congratsBox");
+            box.style.display = "block";
+            setTimeout(() => {
+              box.style.display = "none";
+              loadNewSet();
+            }, 1000);
+          }
+        } else {
+          selectedEnglish.btn.classList.add("incorrect");
+          selectedVietnamese.btn.classList.add("incorrect");
+        }
+
+        setTimeout(() => {
+          clearSelection("englishList");
+          clearSelection("vietnameseList");
+          document.querySelectorAll(".word-btn").forEach(btn => {
+            btn.classList.remove("incorrect");
+          });
+          selectedEnglish = null;
+          selectedVietnamese = null;
+        }, 1000);
+      }
+    }
+
+    loadData();
+  </script>
+</body>
+</html>

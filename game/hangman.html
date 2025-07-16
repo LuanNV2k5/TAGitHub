@@ -1,0 +1,184 @@
+<!-- File: game/hangman.html -->
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Hangman - WordQuest</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/jpeg" href="asset/BTT.jpg">
+  <style>
+    body {
+      background: linear-gradient(to right, #2c3e50, #6a89cc);
+      font-family: 'Poppins', sans-serif;
+      padding-top: 60px;
+    }
+    .game-box {
+      background-color: #dbe7f1;
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 700px;
+      margin: auto;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+      text-align: center;
+    }
+    .meaning {
+      font-size: 1.8rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+      color: #2c3e50;
+    }
+    .word-display {
+      font-size: 2.2rem;
+      letter-spacing: 12px;
+      margin-bottom: 30px;
+    }
+    .keyboard {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      max-width: 400px;
+      margin: 0 auto 20px auto;
+    }
+    .key {
+      width: 36px;
+      padding: 10px 0;
+      border-radius: 8px;
+      background-color: #ffffff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-transform: uppercase;
+    }
+    .key:hover {
+      background-color: #f1f3f5;
+      transform: scale(1.05);
+    }
+    .key.used {
+      background-color: #adb5bd;
+      color: #ffffff;
+      pointer-events: none;
+    }
+    .key.incorrect {
+      background-color: #dc3545 !important;
+      color: white;
+    }
+    .status {
+      font-size: 1.1rem;
+      margin-bottom: 10px;
+      font-weight: 500;
+    }
+    .result-message {
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: #198754;
+      margin-bottom: 10px;
+    }
+    .btn-back {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="game-box">
+    <div id="meaning" class="meaning">Loading...</div>
+    <div id="wordDisplay" class="word-display">_ _ _ _</div>
+    <div id="result" class="result-message"></div>
+    <div id="status" class="status">Lượt sai còn lại: <span id="lives">6</span></div>
+    <div id="keyboard" class="keyboard"></div>
+    <a href="../choose-level.html" class="btn btn-secondary btn-back">⬅️ Quay lại</a>
+  </div>
+</div>
+
+<script>
+  let wordData = [];
+  let currentWord = "";
+  let meaning = "";
+  let guessed = [];
+  let wrong = 0;
+  const maxWrong = 6;
+
+  const params = new URLSearchParams(window.location.search);
+  const level = params.get("level") || "A1";
+
+  async function loadData() {
+    const res = await fetch(`../data/${level}.json`);
+    wordData = await res.json();
+    setTimeout(startGame, 1000);
+  }
+
+  function speak(text, callback) {
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = 'en-US';
+    utter.rate = 0.8;
+    if (callback) utter.onend = callback;
+    speechSynthesis.speak(utter);
+  }
+
+  function startGame() {
+    const pair = wordData[Math.floor(Math.random() * wordData.length)];
+    currentWord = pair.word.toLowerCase();
+    meaning = pair.meaning;
+    guessed = [];
+    wrong = 0;
+
+    document.getElementById("result").innerText = "";
+    document.getElementById("meaning").innerText = meaning;
+    document.getElementById("lives").innerText = maxWrong;
+    generateKeyboard();
+    updateDisplay();
+  }
+
+  function generateKeyboard() {
+    const container = document.getElementById("keyboard");
+    container.innerHTML = "";
+    const letters = "abcdefghijklmnopqrstuvwxyz";
+    letters.split('').forEach(letter => {
+      const btn = document.createElement("div");
+      btn.className = "key";
+      btn.innerText = letter;
+      btn.onclick = () => handleGuess(letter, btn);
+      container.appendChild(btn);
+    });
+  }
+
+  function handleGuess(letter, btn) {
+    btn.classList.add("used");
+    if (currentWord.includes(letter)) {
+      guessed.push(letter);
+      updateDisplay();
+      if (isWordComplete()) {
+        document.getElementById("result").innerText = "✅ Đúng!";
+        setTimeout(() => {
+          speak(currentWord, () => setTimeout(startGame, 500));
+        }, 1000);
+      }
+    } else {
+      wrong++;
+      btn.classList.add("incorrect");
+      setTimeout(() => btn.classList.remove("incorrect"), 500);
+      document.getElementById("lives").innerText = maxWrong - wrong;
+      if (wrong >= maxWrong) {
+        document.getElementById("result").innerText = `💀 Hết lượt! Từ là: ${currentWord}`;
+        setTimeout(startGame, 1500);
+      }
+    }
+  }
+
+  function updateDisplay() {
+    const display = currentWord.split('').map(l => guessed.includes(l) ? l : "_").join(" ");
+    document.getElementById("wordDisplay").innerText = display;
+  }
+
+  function isWordComplete() {
+    return currentWord.split('').every(l => guessed.includes(l));
+  }
+
+  loadData();
+</script>
+</body>
+</html>
